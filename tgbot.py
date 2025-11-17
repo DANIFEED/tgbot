@@ -12,7 +12,7 @@ dp = Dispatcher()
 logging.basicConfig(level=logging.INFO)
 
 # Словарь транслитерации
-TRANSLIT_MAP = {    
+TRANSLIT_MAP = {
     'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'e',
     'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'i', 'к': 'k', 'л': 'l', 'м': 'm',
     'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
@@ -26,6 +26,7 @@ TRANSLIT_MAP = {
 }
 
 def transliterate_fio(text: str) -> str:
+    """Транслитерирует только кириллические символы, оставляя латиницу без изменений"""
     result = []
     for char in text:
         if char in TRANSLIT_MAP:
@@ -34,8 +35,9 @@ def transliterate_fio(text: str) -> str:
             result.append(char)
     return ''.join(result)
 
-def is_cyrillic_fio(text: str) -> bool:
-    return bool(re.match(r'^[а-яёА-ЯЁ\s\-]+$', text.strip()))
+def has_cyrillic(text: str) -> bool:
+    """Проверяет, есть ли в тексте кириллические символы"""
+    return bool(re.search(r'[а-яёА-ЯЁ]', text))
 
 @dp.message(Command(commands=['start']))
 async def process_command_start(message: Message):
@@ -47,7 +49,13 @@ async def process_command_start(message: Message):
 
 @dp.message(Command(commands=['help']))
 async def process_help_command(message: Message):
-    help_text = 'Отправьте ФИО на кириллице для транслитерации'
+    help_text = (
+        'Отправьте ФИО на кириллице для транслитерации\n\n'
+        'Примеры:\n'
+        '• Иван Иванов → Ivan Ivanov\n'
+        '• Петр Петрович → Petr Petrovich\n'
+        '• Смешанный текст: ПЕtr IVANOB → PEtr IVANOB'
+    )
     await message.answer(text=help_text)
     
 @dp.message()
@@ -57,9 +65,10 @@ async def send_echo(message: Message):
     text = message.text
     logging.info(f'{user_name} {user_id}: {text}')
     
-    if is_cyrillic_fio(text):
+    if has_cyrillic(text):
         transliterated = transliterate_fio(text)
         await message.answer(text=transliterated)
+        logging.info(f'Транслитерировано: {text} → {transliterated}')
     else:
         await message.answer(text=text)
  
