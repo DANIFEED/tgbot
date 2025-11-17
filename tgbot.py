@@ -11,7 +11,7 @@ tgbot = Bot(token=TOKEN)
 dp = Dispatcher()
 logging.basicConfig(level=logging.INFO)
 
-# Словарь транслитерации
+# Словарь транслитерации для ВСЕХ символов
 TRANSLIT_MAP = {
     'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'e',
     'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'i', 'к': 'k', 'л': 'l', 'м': 'm',
@@ -26,18 +26,29 @@ TRANSLIT_MAP = {
 }
 
 def transliterate_fio(text: str) -> str:
-    """Транслитерирует только кириллические символы, оставляя латиницу без изменений"""
+    """Транслитерирует все символы согласно стандарту МИД"""
     result = []
     for char in text:
         if char in TRANSLIT_MAP:
             result.append(TRANSLIT_MAP[char])
         else:
-            result.append(char)
-    return ''.join(result)
-
-def has_cyrillic(text: str) -> bool:
-    """Проверяет, есть ли в тексте кириллические символы"""
-    return bool(re.search(r'[а-яёА-ЯЁ]', text))
+            # Оставляем только разрешенные символы (латиница, пробелы, дефисы)
+            if char.isalpha() and char.isascii():
+                result.append(char.upper() if char.isupper() else char)
+            elif char in ' -':
+                result.append(char)
+    
+    text_result = ''.join(result)
+    
+    # Заменяем окончания согласно стандарту МИД
+    text_result = text_result.replace('OB', 'OV')
+    text_result = text_result.replace('Ob', 'Ov')
+    text_result = text_result.replace('SKY', 'SKII')
+    text_result = text_result.replace('SKIY', 'SKII')
+    text_result = text_result.replace('SKIy', 'SKII')
+    text_result = text_result.replace('CKII', 'SKII')  # для случаев типа "Dostoevsky"
+    
+    return text_result
 
 @dp.message(Command(commands=['start']))
 async def process_command_start(message: Message):
@@ -49,13 +60,7 @@ async def process_command_start(message: Message):
 
 @dp.message(Command(commands=['help']))
 async def process_help_command(message: Message):
-    help_text = (
-        'Отправьте ФИО на кириллице для транслитерации\n\n'
-        'Примеры:\n'
-        '• Иван Иванов → Ivan Ivanov\n'
-        '• Петр Петрович → Petr Petrovich\n'
-        '• Смешанный текст: ПЕtr IVANOB → PEtr IVANOB'
-    )
+    help_text = 'Отправьте ФИО для транслитерации в соответствии со стандартом МИД'
     await message.answer(text=help_text)
     
 @dp.message()
@@ -65,12 +70,10 @@ async def send_echo(message: Message):
     text = message.text
     logging.info(f'{user_name} {user_id}: {text}')
     
-    if has_cyrillic(text):
-        transliterated = transliterate_fio(text)
-        await message.answer(text=transliterated)
-        logging.info(f'Транслитерировано: {text} → {transliterated}')
-    else:
-        await message.answer(text=text)
+    # Всегда транслитерируем согласно стандарту МИД
+    transliterated = transliterate_fio(text)
+    await message.answer(text=transliterated)
+    logging.info(f'Транслитерировано: {text} → {transliterated}')
  
 if __name__ == '__main__':
     dp.run_polling(tgbot)
